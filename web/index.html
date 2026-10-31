@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PatternNest Studio — Digital AOP Miter & Seam-Matching Engine</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="dark-mode">
+  <div id="appContainer">
+    <!-- Top Header HUD -->
+    <header id="topHud">
+      <div class="hud-left">
+        <div class="brand-badge">
+          <span class="brand-icon">⬡</span>
+          <div class="brand-text">
+            <span class="brand-title">PatternNest Studio</span>
+            <span class="brand-subtitle">Digital AOP Phase-Lock & Seam Miter Engine</span>
+          </div>
+        </div>
+
+        <div class="hud-divider"></div>
+
+        <div class="control-group">
+          <label for="selectPreset">Garment Preset</label>
+          <select id="selectPreset" class="hud-select">
+            <option value="plaid_oxford_shirt">Tartan Plaid Oxford Shirt</option>
+            <option value="breton_striped_tee">Breton Sailor Striped Tee</option>
+            <option value="botanical_floral_dress">Botanical Floral AOP Dress</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="hud-center">
+        <div class="param-chip" title="Repeat Tile Dimensions (Width x Height)">
+          <span class="param-label">REPEAT</span>
+          <input type="number" id="inputRepeatW" class="hud-input" value="100" min="10" max="1000" step="5">
+          <span class="param-unit">×</span>
+          <input type="number" id="inputRepeatH" class="hud-input" value="100" min="10" max="1000" step="5">
+          <span class="param-unit">mm</span>
+        </div>
+
+        <div class="param-chip" title="Roll Cuttable Width">
+          <span class="param-label">ROLL W</span>
+          <input type="number" id="inputRollW" class="hud-input" value="1480" min="600" max="3200" step="10">
+          <span class="param-unit">mm</span>
+        </div>
+
+        <div class="param-chip" title="Clearance Buffer between cutlines">
+          <span class="param-label">BUFFER</span>
+          <input type="number" id="inputBuffer" class="hud-input" value="4" min="0" max="25" step="1">
+          <span class="param-unit">mm</span>
+        </div>
+
+        <div class="hud-view-toggle">
+          <button id="btnViewMarker" class="view-btn active" title="Cutting Roll Lay Table View">
+            <span class="icon">▤</span> Lay Marker
+          </button>
+          <button id="btnViewGarment" class="view-btn" title="Assembled Garment Seam View">
+            <span class="icon">👕</span> Design Match
+          </button>
+        </div>
+      </div>
+
+      <div class="hud-right">
+        <button id="btnToggleTexture" class="hud-action-btn secondary" title="Toggle Repeating Print Texture Visibility">
+          <span class="icon">👁</span> Print Texture
+        </button>
+        <button id="btnAutoNest" class="hud-action-btn primary" title="Run Phase-Locked Bottom-Left-Lattice Nesting">
+          <span class="icon">⚡</span> Auto-Nest
+        </button>
+        <button id="btnExportSvg" class="hud-action-btn tertiary" title="Export Production Marker SVG">
+          <span class="icon">⤓</span> Export
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main id="mainWorkspace">
+      <!-- Center Canvas Viewport -->
+      <div id="viewportContainer">
+        <canvas id="studioCanvas"></canvas>
+
+        <!-- Floating HUD Overlay -->
+        <div id="canvasHudOverlay">
+          <div id="hudSnapIndicator" class="hud-pill">
+            <span class="status-dot"></span>
+            <span id="txtSnapStatus">Phase Snap: Active (Δ = 0.00mm)</span>
+          </div>
+          <div id="hudZoomControls" class="hud-pill">
+            <button id="btnZoomOut" class="btn-micro">−</button>
+            <span id="txtZoomLevel">100%</span>
+            <button id="btnZoomIn" class="btn-micro">+</button>
+            <button id="btnZoomFit" class="btn-micro">Fit</button>
+          </div>
+        </div>
+
+        <!-- Seam Alignment Close-Up Modal / Overlay -->
+        <div id="seamPreviewFloat" class="seam-preview-card">
+          <div class="preview-header">
+            <span class="preview-title" id="previewTitle">Seam Miter Inspection</span>
+            <button id="btnClosePreview" class="btn-close">×</button>
+          </div>
+          <canvas id="seamCloseUpCanvas" width="320" height="200"></canvas>
+          <div class="preview-footer">
+            <span id="previewMetric">Mismatch: 0.00 mm (100% Match)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Inspector Sidebar -->
+      <aside id="inspectorDrawer">
+        <!-- Telemetry Bento -->
+        <div class="sidebar-section">
+          <div class="section-header">
+            <span class="section-title">MARKER TELEMETRY</span>
+          </div>
+          <div class="telemetry-bento-grid">
+            <div class="bento-card">
+              <span class="bento-label">UTILIZATION</span>
+              <span id="statYield" class="bento-value highlight">--%</span>
+            </div>
+            <div class="bento-card">
+              <span class="bento-label">MARKER LENGTH</span>
+              <span id="statLength" class="bento-value">-- m</span>
+            </div>
+            <div class="bento-card">
+              <span class="bento-label">SOLVE TIME</span>
+              <span id="statSolveTime" class="bento-value">-- ms</span>
+            </div>
+            <div class="bento-card">
+              <span class="bento-label">PIECES NESTED</span>
+              <span id="statPieceCount" class="bento-value">-- / --</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Seam Contracts & Mitering Validator -->
+        <div class="sidebar-section">
+          <div class="section-header">
+            <span class="section-title">SEAM MITERING VERIFICATION</span>
+            <span id="badgeSeamOverall" class="badge badge-success">✓ PHASE LOCKED</span>
+          </div>
+          <div id="contractsList" class="contracts-list">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <!-- Pattern Pieces Deck -->
+        <div class="sidebar-section flexible">
+          <div class="section-header">
+            <span class="section-title">GARMENT PIECES</span>
+            <span id="badgePieceTotal" class="badge">9 Pieces</span>
+          </div>
+          <div id="piecesList" class="pieces-deck">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
