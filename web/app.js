@@ -38,6 +38,12 @@ class PatternNestApp {
     // Selected Contract for close-up inspection
     this.activeContract = null;
 
+    // Custom Imported Data State
+    this.importedPieces = [];
+    this.customContracts = [];
+    this.customArtworkImage = null;
+    this.isCustomImport = false;
+
     this.initEventListeners();
     this.resizeCanvas();
     window.addEventListener('resize', () => this.resizeCanvas());
@@ -86,6 +92,9 @@ class PatternNestApp {
     document.getElementById('btnClosePreview').addEventListener('click', () => {
       document.getElementById('seamPreviewFloat').classList.remove('visible');
     });
+
+    // Import Modal triggers
+    this.initImportWizard();
 
     // Mouse canvas events for pan/zoom & piece drag
     this.canvas.addEventListener('mousedown', (e) => this.onMouseDown(e));
@@ -150,6 +159,11 @@ class PatternNestApp {
         buffer_mm: parseFloat(document.getElementById('inputBuffer').value),
         optimize: true,
       };
+
+      if (this.isCustomImport && this.presetData?.pieces) {
+        payload.custom_pieces = this.presetData.pieces;
+        payload.custom_contracts = this.presetData.contracts;
+      }
 
       const resp = await fetch('/api/nest', {
         method: 'POST',
@@ -355,6 +369,262 @@ class PatternNestApp {
     const msg = mismatch === 0.0 ? '✓ Exact 1:1 Phase Match (0.00 mm Mismatch)' : `⚠ Seam Offset: ${mismatch.toFixed(2)} mm`;
     document.getElementById('previewMetric').textContent = msg;
     document.getElementById('previewMetric').style.color = mismatch === 0.0 ? '#10b981' : '#ef4444';
+  }
+
+  // =========================================================================
+  // Import Wizard & Custom Pattern Pipeline
+  // =========================================================================
+
+  initImportWizard() {
+    const modal = document.getElementById('modalImport');
+    const btnOpen = document.getElementById('btnOpenImport');
+    const btnClose = document.getElementById('btnCloseImport');
+    const btnCancel = document.getElementById('btnCancelImport');
+    const btnApply = document.getElementById('btnApplyImport');
+
+    // Open/Close
+    btnOpen.addEventListener('click', () => modal.classList.add('visible'));
+    const closeModal = () => modal.classList.remove('visible');
+    btnClose.addEventListener('click', closeModal);
+    btnCancel.addEventListener('click', closeModal);
+
+    // Tab Navigation
+    const tabs = document.querySelectorAll('.modal-tab');
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        tabs.forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+        tab.classList.add('active');
+        const target = tab.getAttribute('data-tab');
+        document.getElementById(target).classList.add('active');
+      });
+    });
+
+    // Artwork File Input & Drag/Drop
+    const fileArt = document.getElementById('fileArtwork');
+    const dropArt = document.getElementById('dropZoneArtwork');
+    fileArt.addEventListener('change', (e) => {
+      if (e.target.files?.[0]) this.handleArtworkFile(e.target.files[0]);
+    });
+    this.setupDropZone(dropArt, (file) => this.handleArtworkFile(file));
+
+    // CAD File Input & Drag/Drop
+    const fileCad = document.getElementById('fileCad');
+    const dropCad = document.getElementById('dropZoneCad');
+    fileCad.addEventListener('change', (e) => {
+      if (e.target.files?.[0]) this.handleCadFile(e.target.files[0]);
+    });
+    this.setupDropZone(dropCad, (file) => this.handleCadFile(file));
+
+    // Add Seam Contract Button
+    document.getElementById('btnAddContract').addEventListener('click', () => this.addCustomContract());
+
+    // Apply Import Button
+    btnApply.addEventListener('click', () => this.applyImportedProject());
+  }
+
+  setupDropZone(elem, onFile) {
+    ['dragenter', 'dragover'].forEach(name => {
+      elem.addEventListener(name, (e) => {
+        e.preventDefault();
+        elem.classList.add('dragover');
+      });
+    });
+    ['dragleave', 'drop'].forEach(name => {
+      elem.addEventListener(name, (e) => {
+        e.preventDefault();
+        elem.classList.remove('dragover');
+      });
+    });
+    elem.addEventListener('drop', (e) => {
+      const file = e.dataTransfer?.files?.[0];
+      if (file) onFile(file);
+    });
+  }
+
+  handleArtworkFile(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        this.customArtworkImage = img;
+        const thumb = document.getElementById('artworkPreviewThumb');
+        thumb.innerHTML = `<img src="${e.target.result}" style="max-height:80px; max-width:100%; object-fit:contain; border-radius:4px;" />`;
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  async handleCadFile(file) {
+    const unitScale = parseFloat(document.getElementById('importCadUnit').value);
+    const fileName = file.name.toLowerCase();
+
+    try {
+      const text = await file.text();
+      let endpoint = '';
+      let payload = {};
+
+      if (fileName.endsWith('.svg')) {
+        endpoint = '/api/import/svg';
+        payload = { svg: text, scale: unitScale };
+      } else if (fileName.endsWith('.dxf')) {
+        endpoint = '/api/import/dxf';
+        payload = { dxf: text, scale: unitScale };
+      } else if (fileName.endsWith('.json')) {
+        endpoint = '/api/import/json';
+        payload = { json: text };
+      } else {
+        alert('Unsupported format. Please upload .svg, .dxf, or .json pattern files.');
+        return;
+      }
+
+      const resp = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!resp.ok) throw new Error('Failed to parse CAD file');
+      const data = await resp.json();
+
+      this.importedPieces = data.pieces || [];
+      if (data.contracts) this.customContracts = data.contracts;
+
+      document.getElementById('txtImportedCount').textContent = `Parsed ${this.importedPieces.length} Pieces`;
+
+      // Render pieces in modal scroll list
+      const scroll = document.getElementById('importedPiecesList');
+      scroll.innerHTML = '';
+      this.importedPieces.forEach((p, idx) => {
+        const item = document.createElement('div');
+        item.className = 'piece-row';
+        item.innerHTML = `
+          <div class="piece-left">
+            <span class="piece-color-pip" style="background-color: ${p.color_tag}"></span>
+            <span class="piece-name">${p.name}</span>
+          </div>
+          <span class="piece-metrics">${Math.round(p.bounds[2] - p.bounds[0])}×${Math.round(p.bounds[3] - p.bounds[1])}mm</span>
+        `;
+        scroll.appendChild(item);
+      });
+
+      this.updateSeamLinkerOptions();
+    } catch (err) {
+      console.error(err);
+      alert('Error parsing CAD file: ' + err.message);
+    }
+  }
+
+  updateSeamLinkerOptions() {
+    const selA = document.getElementById('linkPieceA');
+    const selB = document.getElementById('linkPieceB');
+    selA.innerHTML = '';
+    selB.innerHTML = '';
+
+    const pieces = this.importedPieces.length > 0 ? this.importedPieces : (this.presetData?.pieces || []);
+    pieces.forEach(p => {
+      const optA = document.createElement('option');
+      optA.value = p.id;
+      optA.textContent = p.name;
+      selA.appendChild(optA);
+
+      const optB = document.createElement('option');
+      optB.value = p.id;
+      optB.textContent = p.name;
+      selB.appendChild(optB);
+    });
+
+    if (selB.options.length > 1) selB.selectedIndex = 1;
+  }
+
+  addCustomContract() {
+    const type = document.getElementById('linkContractType').value;
+    const pieceA = document.getElementById('linkPieceA').value;
+    const pieceB = document.getElementById('linkPieceB').value;
+    const tol = parseFloat(document.getElementById('linkTolerance').value);
+
+    if (pieceA === pieceB) {
+      alert('Please select two distinct pieces for a seam contract.');
+      return;
+    }
+
+    const typeNames = {
+      CF_PLACKET: 'CF Placket Stripe Match',
+      POCKET_MATCH: 'Patch Pocket 1:1 Match',
+      SIDE_SEAM: 'Side Seam Continuity',
+      YOKE_CHEVRON: 'Shoulder Yoke Chevron',
+      WAIST_MATCH: 'Waistline Motif Match',
+    };
+
+    const newContract = {
+      id: `custom_contract_${Date.now()}`,
+      name: typeNames[type] || type,
+      contract_type: type,
+      piece_a_id: pieceA,
+      piece_b_id: pieceB,
+      description: `Enforces pattern alignment between ${pieceA} and ${pieceB}`,
+      expected_delta_uv: [0.0, 0.0],
+      tolerance_mm: tol,
+    };
+
+    this.customContracts.push(newContract);
+    this.renderCustomContractsList();
+  }
+
+  renderCustomContractsList() {
+    const list = document.getElementById('customContractsList');
+    list.innerHTML = '';
+    this.customContracts.forEach((c, idx) => {
+      const row = document.createElement('div');
+      row.className = 'contract-card';
+      row.innerHTML = `
+        <div class="contract-top">
+          <span class="contract-name">${c.name}</span>
+          <span class="contract-delta">Tol: ±${c.tolerance_mm}mm</span>
+        </div>
+        <div class="contract-desc">${c.piece_a_id} ⟷ ${c.piece_b_id}</div>
+      `;
+      list.appendChild(row);
+    });
+  }
+
+  applyImportedProject() {
+    const repW = parseFloat(document.getElementById('importRepW').value);
+    const repH = parseFloat(document.getElementById('importRepH').value);
+
+    // Update global inputs
+    document.getElementById('inputRepeatW').value = repW;
+    document.getElementById('inputRepeatH').value = repH;
+
+    if (this.importedPieces.length > 0) {
+      this.isCustomImport = true;
+      this.presetData = {
+        metadata: {
+          preset_id: 'custom_imported',
+          title: 'Custom Imported Garment',
+          repeat_type: this.customArtworkImage ? 'custom_image' : 'plaid',
+          repeat_width_mm: repW,
+          repeat_height_mm: repH,
+          roll_width_mm: parseFloat(document.getElementById('inputRollW').value),
+        },
+        pieces: this.importedPieces,
+        contracts: this.customContracts,
+      };
+
+      document.getElementById('badgePieceTotal').textContent = `${this.importedPieces.length} Pieces`;
+      this.populatePiecesList();
+      this.populateContractsList();
+    } else if (this.customArtworkImage) {
+      // Just custom image applied to existing preset
+      if (this.presetData) {
+        this.presetData.metadata.repeat_width_mm = repW;
+        this.presetData.metadata.repeat_height_mm = repH;
+      }
+    }
+
+    document.getElementById('modalImport').classList.remove('visible');
+    this.runAutoNest();
   }
 
   // =========================================================================
@@ -721,6 +991,11 @@ class PatternNestApp {
   // =========================================================================
 
   drawFabricTile(ctx, originX, originY, wRep, hRep, areaW, areaH) {
+    if (this.customArtworkImage) {
+      this.drawCustomImageTile(ctx, originX, originY, wRep, hRep, areaW, areaH);
+      return;
+    }
+
     const type = this.presetData?.metadata?.repeat_type || 'plaid';
 
     if (type === 'plaid') {
@@ -729,6 +1004,17 @@ class PatternNestApp {
       this.drawStripePattern(ctx, originX, originY, wRep, hRep, areaW, areaH);
     } else {
       this.drawFloralPattern(ctx, originX, originY, wRep, hRep, areaW, areaH);
+    }
+  }
+
+  drawCustomImageTile(ctx, ox, oy, wRep, hRep, areaW, areaH) {
+    const startX = Math.floor(-ox / wRep) * wRep + ox;
+    const startY = Math.floor(-oy / hRep) * hRep + oy;
+
+    for (let x = startX; x < areaW + wRep; x += wRep) {
+      for (let y = startY; y < areaH + hRep; y += hRep) {
+        ctx.drawImage(this.customArtworkImage, x, y, wRep, hRep);
+      }
     }
   }
 

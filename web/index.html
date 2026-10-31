@@ -66,6 +66,9 @@
       </div>
 
       <div class="hud-right">
+        <button id="btnOpenImport" class="hud-action-btn primary-gold" title="Import Custom Repeat Print or Garment CAD Patterns">
+          <span class="icon">📥</span> Import
+        </button>
         <button id="btnToggleTexture" class="hud-action-btn secondary" title="Toggle Repeating Print Texture Visibility">
           <span class="icon">👁</span> Print Texture
         </button>
@@ -161,6 +164,139 @@
         </div>
       </aside>
     </main>
+  </div>
+
+  <!-- Import Wizard Modal -->
+  <div id="modalImport" class="modal-backdrop">
+    <div class="modal-window">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="modal-badge">IMPORT STUDIO</span>
+          <h2 class="modal-title">Import Custom Patterns & Repeat Artwork</h2>
+        </div>
+        <button id="btnCloseImport" class="btn-modal-close">×</button>
+      </div>
+
+      <div class="modal-tabs">
+        <button class="modal-tab active" data-tab="tabArtwork">1. Repeat Artwork Tile</button>
+        <button class="modal-tab" data-tab="tabCadPatterns">2. Garment CAD Patterns (SVG/DXF)</button>
+        <button class="modal-tab" data-tab="tabSeamLinker">3. Seam Match Linker</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Tab 1: Repeat Artwork Tile -->
+        <div id="tabArtwork" class="tab-pane active">
+          <div class="import-grid">
+            <div class="drop-zone" id="dropZoneArtwork">
+              <input type="file" id="fileArtwork" accept="image/*,.svg" style="display:none">
+              <span class="drop-icon">🖼</span>
+              <span class="drop-label">Drag & Drop Seamless Repeat Tile</span>
+              <span class="drop-sub">PNG, JPG, WebP, SVG</span>
+              <button class="btn-browse" onclick="document.getElementById('fileArtwork').click()">Browse Image</button>
+            </div>
+            <div class="import-config-card">
+              <h3>Repeat Metric Scale</h3>
+              <p class="config-desc">Define real-world dimensions of one seamless repeat cycle.</p>
+              <div class="input-row">
+                <label>Repeat Width (W)</label>
+                <div class="input-with-unit">
+                  <input type="number" id="importRepW" value="120" min="10" max="2000" step="5">
+                  <span>mm</span>
+                </div>
+              </div>
+              <div class="input-row">
+                <label>Repeat Height (H)</label>
+                <div class="input-with-unit">
+                  <input type="number" id="importRepH" value="120" min="10" max="2000" step="5">
+                  <span>mm</span>
+                </div>
+              </div>
+              <div class="artwork-preview-box">
+                <span class="preview-tag">Tile Preview</span>
+                <div id="artworkPreviewThumb" class="thumb-container"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 2: Garment CAD Patterns -->
+        <div id="tabCadPatterns" class="tab-pane">
+          <div class="import-grid">
+            <div class="drop-zone" id="dropZoneCad">
+              <input type="file" id="fileCad" accept=".svg,.dxf,.json" style="display:none">
+              <span class="drop-icon">✂</span>
+              <span class="drop-label">Drag & Drop 2D Garment Pattern</span>
+              <span class="drop-sub">SVG (Illustrator/CLO), DXF (AAMA/ASTM), or JSON</span>
+              <button class="btn-browse" onclick="document.getElementById('fileCad').click()">Browse CAD File</button>
+            </div>
+            <div class="import-config-card">
+              <h3>CAD Scale & Unit</h3>
+              <div class="input-row">
+                <label>Source Unit</label>
+                <select id="importCadUnit" class="hud-select full-width">
+                  <option value="1.0">Millimeters (1 unit = 1mm)</option>
+                  <option value="10.0">Centimeters (1 unit = 10mm)</option>
+                  <option value="25.4">Inches (1 unit = 25.4mm)</option>
+                  <option value="0.264583">Pixels (96 DPI SVG)</option>
+                </select>
+              </div>
+              <div class="imported-pieces-preview">
+                <span class="preview-tag" id="txtImportedCount">Parsed 0 Pieces</span>
+                <div id="importedPiecesList" class="imported-items-scroll"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 3: Seam Match Linker -->
+        <div id="tabSeamLinker" class="tab-pane">
+          <div class="seam-linker-layout">
+            <div class="linker-form">
+              <h3>Create Seam Match Contract</h3>
+              <p class="config-desc">Pair two garment pieces to enforce continuous pattern alignment.</p>
+              <div class="input-row">
+                <label>Contract Type</label>
+                <select id="linkContractType" class="hud-select full-width">
+                  <option value="CF_PLACKET">Center Front Placket Stripe Match</option>
+                  <option value="POCKET_MATCH">Patch Pocket 1:1 Chest Continuation</option>
+                  <option value="SIDE_SEAM">Side Seam Horizontal Course Match</option>
+                  <option value="YOKE_CHEVRON">Shoulder Yoke Chevron / Flow</option>
+                  <option value="WAIST_MATCH">Waistline Motif Continuation</option>
+                </select>
+              </div>
+              <div class="pair-row">
+                <div class="pair-col">
+                  <label>Primary Piece A</label>
+                  <select id="linkPieceA" class="hud-select full-width"></select>
+                </div>
+                <span class="link-arrow">⟷</span>
+                <div class="pair-col">
+                  <label>Matched Piece B</label>
+                  <select id="linkPieceB" class="hud-select full-width"></select>
+                </div>
+              </div>
+              <div class="input-row">
+                <label>Tolerance (mm)</label>
+                <div class="input-with-unit">
+                  <input type="number" id="linkTolerance" value="1.0" min="0.1" max="10.0" step="0.5">
+                  <span>mm</span>
+                </div>
+              </div>
+              <button id="btnAddContract" class="btn-action-small">+ Add Seam Contract</button>
+            </div>
+            <div class="active-contracts-box">
+              <h3>Active Seam Contracts</h3>
+              <div id="customContractsList" class="contracts-scroll"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button id="btnCancelImport" class="hud-action-btn secondary">Cancel</button>
+        <button id="btnApplyImport" class="hud-action-btn primary">✓ Apply to Marker Lay</button>
+      </div>
+    </div>
   </div>
 
   <script type="module" src="app.js"></script>

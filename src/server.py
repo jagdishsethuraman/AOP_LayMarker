@@ -12,6 +12,9 @@ from urllib.parse import urlparse, parse_qs
 from typing import Dict, Any
 
 from .presets import list_presets, load_preset
+from .core.pieces import GarmentPiece
+from .core.seam_contracts import SeamContract
+from .core.importers import SVGPatternImporter, DXFPatternImporter, JSONPatternImporter
 from .nesting.lattice_placer import LatticePlacer
 from .nesting.optimizer import NestingOptimizer
 from .nesting.validator import SeamValidator
@@ -92,16 +95,97 @@ class StudioHandler(BaseHTTPRequestHandler):
             self._handle_validate(body)
             return
 
+        # REST API: Import SVG Pattern
+        if path == "/api/import/svg":
+            svg_text = body.get("svg", "")
+            scale = float(body.get("scale", 1.0))
+            try:
+                pieces = SVGPatternImporter.parse_svg(svg_text, scale)
+                self._send_json(200, {
+                    "success": True,
+                    "pieces": [p.to_dict() for p in pieces],
+                    "count": len(pieces),
+                })
+            except Exception as e:
+                self._send_json(400, {"error": f"SVG Import failed: {str(e)}"})
+            return
+
+        # REST API: Import DXF Pattern
+        if path == "/api/import/dxf":
+            dxf_text = body.get("dxf", "")
+            scale = float(body.get("scale", 1.0))
+            try:
+                pieces = DXFPatternImporter.parse_dxf(dxf_text, scale)
+                self._send_json(200, {
+                    "success": True,
+                    "pieces": [p.to_dict() for p in pieces],
+                    "count": len(pieces),
+                })
+            except Exception as e:
+                self._send_json(400, {"error": f"DXF Import failed: {str(e)}"})
+            return
+
+        # REST API: Import JSON Full Project
+        if path == "/api/import/json":
+            json_text = body.get("json", "")
+            try:
+                pieces, contracts, meta = JSONPatternImporter.parse_json(json_text)
+                self._send_json(200, {
+                    "success": True,
+                    "pieces": [p.to_dict() for p in pieces],
+                    "contracts": contracts,
+                    "metadata": meta,
+                })
+            except Exception as e:
+                self._send_json(400, {"error": f"JSON Import failed: {str(e)}"})
+            return
+
         self.send_error(404, f"Endpoint not found: {path}")
 
     def _handle_nest(self, body: Dict[str, Any]) -> None:
-        """Execute Phase-Locked Nesting on server."""
-        preset_id = body.get("preset_id", "plaid_oxford_shirt")
-        try:
-            pieces, contracts, meta = load_preset(preset_id)
-        except Exception as e:
-            self._send_json(400, {"error": f"Failed to load preset: {str(e)}"})
-            return
+        """Execute Phase-Locked Nesting on server (preset or custom imported pieces)."""
+        custom_pieces_data = body.get("custom_pieces")
+        custom_contracts_data = body.get("custom_contracts")
+
+        if custom_pieces_data:
+            # Reconstruct pieces from payload
+            pieces = []
+            for p in custom_pieces_data:
+                phase = (p.get("design_phase", {}).get("u", 0.0), p.get("design_phase", {}).get("v", 0.0))
+                pieces.append(GarmentPiece(
+                    id=p["id"],
+                    name=p["name"],
+                    category=p.get("category", "body"),
+                    raw_vertices=[(pt[0], pt[1]) for pt in p["vertices"]],
+                    design_phase=phase,
+                    allowed_rotations=p.get("allowed_rotations", [0.0]),
+                    color_tag=p.get("color_tag", "#38bdf8"),
+                ))
+            contracts = []
+            if custom_contracts_data:
+                for c in custom_contracts_data:
+                    contracts.append(SeamContract(
+                        id=c["id"],
+                        name=c["name"],
+                        contract_type=c.get("contract_type", "CUSTOM"),
+                        piece_a_id=c["piece_a_id"],
+                        piece_b_id=c["piece_b_id"],
+                        description=c.get("description", ""),
+                        expected_delta_uv=tuple(c.get("expected_delta_uv", [0.0, 0.0])),
+                        tolerance_mm=float(c.get("tolerance_mm", 1.0)),
+                    ))
+            meta = {
+                "roll_width_mm": float(body.get("roll_width_mm", 1480.0)),
+                "repeat_width_mm": float(body.get("repeat_width_mm", 100.0)),
+                "repeat_height_mm": float(body.get("repeat_height_mm", 100.0)),
+            }
+        else:
+            preset_id = body.get("preset_id", "plaid_oxford_shirt")
+            try:
+                pieces, contracts, meta = load_preset(preset_id)
+            except Exception as e:
+                self._send_json(400, {"error": f"Failed to load preset: {str(e)}"})
+                return
 
         roll_width = float(body.get("roll_width_mm", meta["roll_width_mm"]))
         repeat_w = float(body.get("repeat_width_mm", meta["repeat_width_mm"]))
