@@ -996,3 +996,96 @@ body.dark-mode {
   justify-content: flex-end;
   gap: 10px;
 }
+
+/* ==========================================================================
+   Design Match Floating Phase Calibrator Bar
+   ========================================================================== */
+
+.phase-calibrator-bar {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: none;
+  align-items: center;
+  gap: 12px;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-gold);
+  border-radius: var(--radius-md);
+  padding: 8px 16px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+  z-index: 30;
+  animation: slideDownFade 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.phase-calibrator-bar.visible {
+  display: flex;
+}
+
+@keyframes slideDownFade {
+  from { opacity: 0; transform: translate(-50%, -10px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.calibrator-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--accent-gold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-right: 1px solid var(--border-subtle);
+  padding-right: 12px;
+}
+
+.calibrator-coords {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+.calibrator-coords strong {
+  color: var(--text-main);
+  font-weight: 700;
+}
+
+.btn-calibrator-action {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-main);
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.btn-calibrator-action:hover {
+  border-color: var(--accent-gold);
+  color: var(--accent-gold);
+}
+
+.btn-calibrator-action.secondary {
+  color: var(--text-dim);
+}
+
+.btn-calibrator-action.secondary:hover {
+  color: var(--text-main);
+}
+
+.calibrator-hint {
+  font-size: 0.68rem;
+  color: var(--text-dim);
+  border-left: 1px solid var(--border-subtle);
+  padding-left: 12px;
+  font-style: italic;
+  white-space: nowrap;
+}

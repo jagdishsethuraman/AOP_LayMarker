@@ -101,6 +101,26 @@
           </div>
         </div>
 
+        <!-- Design Match Mode Floating Phase Calibrator Bar -->
+        <div id="designPhaseCalibrator" class="phase-calibrator-bar">
+          <div class="calibrator-badge">
+            <span class="icon">✨</span>
+            <span>Phase Calibrator</span>
+          </div>
+          <div class="calibrator-coords">
+            <span>Offset:</span>
+            <span>U:</span> <strong id="lblPhaseU">0.0 mm</strong>
+            <span>V:</span> <strong id="lblPhaseV">0.0 mm</strong>
+          </div>
+          <button id="btnCenterStripe" class="btn-calibrator-action" title="Snap Center Front Placket to Stripe Center">
+            ⇥ Center on Placket
+          </button>
+          <button id="btnResetPhase" class="btn-calibrator-action secondary" title="Reset Texture Phase to (0,0)">
+            ↺ Reset
+          </button>
+          <span class="calibrator-hint">💡 Click & drag canvas to shift print seamlessly across all garment panels</span>
+        </div>
+
         <!-- Seam Alignment Close-Up Modal / Overlay -->
         <div id="seamPreviewFloat" class="seam-preview-card">
           <div class="preview-header">

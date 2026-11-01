@@ -44,6 +44,12 @@ class PatternNestApp {
     this.customArtworkImage = null;
     this.isCustomImport = false;
 
+    // Interactive Phase Calibrator State
+    this.calibratedPhaseOffset = { u: 0.0, v: 0.0 };
+    this.isDraggingTexturePhase = false;
+    this.textureDragStart = { x: 0, y: 0, u: 0, v: 0 };
+    this.basePiecePhases = {};
+
     this.initEventListeners();
     this.resizeCanvas();
     window.addEventListener('resize', () => this.resizeCanvas());
@@ -96,6 +102,10 @@ class PatternNestApp {
     // Import Modal triggers
     this.initImportWizard();
 
+    // Design View Phase Calibrator controls
+    document.getElementById('btnCenterStripe')?.addEventListener('click', () => this.centerPhaseOnPlacket());
+    document.getElementById('btnResetPhase')?.addEventListener('click', () => this.resetPhaseCalibration());
+
     // Mouse canvas events for pan/zoom & piece drag
     this.canvas.addEventListener('mousedown', (e) => this.onMouseDown(e));
     window.addEventListener('mousemove', (e) => this.onMouseMove(e));
@@ -136,6 +146,10 @@ class PatternNestApp {
 
       this.populatePiecesList();
       this.populateContractsList();
+
+      this.calibratedPhaseOffset = { u: 0.0, v: 0.0 };
+      this.cacheBasePiecePhases();
+      this.updateCalibratorLabels();
 
       // Automatically nest initially
       await this.runAutoNest();
@@ -651,6 +665,19 @@ class PatternNestApp {
     const mouseY = e.clientY - rect.top;
     const world = this.screenToWorld(mouseX, mouseY);
 
+    if (this.viewMode === 'garment') {
+      // Interactive Phase Calibrator: Drag print pattern across garment
+      this.isDraggingTexturePhase = true;
+      this.textureDragStart = {
+        x: world.x,
+        y: world.y,
+        u: this.calibratedPhaseOffset.u,
+        v: this.calibratedPhaseOffset.v,
+      };
+      this.canvas.classList.add('dragging');
+      return;
+    }
+
     if (this.viewMode === 'marker' && this.markerData) {
       // Test if user clicked inside any piece to drag
       for (let i = this.markerData.pieces.length - 1; i >= 0; i--) {
@@ -676,6 +703,29 @@ class PatternNestApp {
     const rect = this.canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
+
+    if (this.viewMode === 'garment' && this.isDraggingTexturePhase) {
+      const world = this.screenToWorld(mouseX, mouseY);
+      const repW = parseFloat(document.getElementById('inputRepeatW').value) || 100.0;
+      const repH = parseFloat(document.getElementById('inputRepeatH').value) || 100.0;
+
+      const dx = world.x - this.textureDragStart.x;
+      const dy = world.y - this.textureDragStart.y;
+
+      let newU = (this.textureDragStart.u - dx) % repW;
+      if (newU < 0) newU += repW;
+      let newV = (this.textureDragStart.v - dy) % repH;
+      if (newV < 0) newV += repH;
+
+      this.calibratedPhaseOffset = {
+        u: Math.round(newU * 10) / 10,
+        v: Math.round(newV * 10) / 10,
+      };
+
+      this.syncCalibratedPhasesToPieces();
+      this.updateCalibratorLabels();
+      return;
+    }
 
     if (this.isDraggingPiece && this.draggedPiece) {
       const world = this.screenToWorld(mouseX, mouseY);
@@ -725,6 +775,14 @@ class PatternNestApp {
   }
 
   onMouseUp() {
+    if (this.isDraggingTexturePhase) {
+      this.isDraggingTexturePhase = false;
+      this.canvas.classList.remove('dragging');
+      this.syncCalibratedPhasesToPieces();
+      this.runAutoNest();
+      return;
+    }
+
     if (this.isDraggingPiece) {
       this.isDraggingPiece = false;
       this.draggedPiece = null;
@@ -786,6 +844,56 @@ class PatternNestApp {
     this.viewMode = mode;
     document.getElementById('btnViewMarker').classList.toggle('active', mode === 'marker');
     document.getElementById('btnViewGarment').classList.toggle('active', mode === 'garment');
+    const calibrator = document.getElementById('designPhaseCalibrator');
+    if (calibrator) {
+      calibrator.classList.toggle('visible', mode === 'garment');
+    }
+  }
+
+  cacheBasePiecePhases() {
+    this.basePiecePhases = {};
+    if (!this.presetData?.pieces) return;
+    this.presetData.pieces.forEach(p => {
+      this.basePiecePhases[p.id] = { u: p.design_phase.u, v: p.design_phase.v };
+    });
+  }
+
+  updateCalibratorLabels() {
+    const lblU = document.getElementById('lblPhaseU');
+    const lblV = document.getElementById('lblPhaseV');
+    if (lblU) lblU.textContent = `${this.calibratedPhaseOffset.u.toFixed(1)} mm`;
+    if (lblV) lblV.textContent = `${this.calibratedPhaseOffset.v.toFixed(1)} mm`;
+  }
+
+  syncCalibratedPhasesToPieces() {
+    if (!this.presetData?.pieces) return;
+    const repW = parseFloat(document.getElementById('inputRepeatW').value) || 100.0;
+    const repH = parseFloat(document.getElementById('inputRepeatH').value) || 100.0;
+
+    this.presetData.pieces.forEach(p => {
+      const base = this.basePiecePhases[p.id] || { u: p.design_phase.u, v: p.design_phase.v };
+      let newU = (base.u + this.calibratedPhaseOffset.u) % repW;
+      if (newU < 0) newU += repW;
+      let newV = (base.v + this.calibratedPhaseOffset.v) % repH;
+      if (newV < 0) newV += repH;
+      p.design_phase.u = Math.round(newU * 10) / 10;
+      p.design_phase.v = Math.round(newV * 10) / 10;
+    });
+  }
+
+  centerPhaseOnPlacket() {
+    const repW = parseFloat(document.getElementById('inputRepeatW').value) || 100.0;
+    this.calibratedPhaseOffset.u = Math.round((repW / 2) * 10) / 10;
+    this.syncCalibratedPhasesToPieces();
+    this.updateCalibratorLabels();
+    this.runAutoNest();
+  }
+
+  resetPhaseCalibration() {
+    this.calibratedPhaseOffset = { u: 0.0, v: 0.0 };
+    this.syncCalibratedPhasesToPieces();
+    this.updateCalibratorLabels();
+    this.runAutoNest();
   }
 
   // =========================================================================
@@ -982,6 +1090,22 @@ class PatternNestApp {
 
       ctx.restore();
     });
+
+    // Draw Center Front Placket Alignment Reticle Guide Line
+    ctx.save();
+    ctx.strokeStyle = 'rgba(229, 169, 60, 0.5)';
+    ctx.lineWidth = 1.5 / this.camera.scale;
+    ctx.setLineDash([6 / this.camera.scale, 4 / this.camera.scale]);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(0, 720);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = '#e5a93c';
+    ctx.font = `${10 / this.camera.scale}px var(--font-mono)`;
+    ctx.fillText('⇥ CF PLACKET MATCH LINE', 8, 25);
+    ctx.restore();
 
     ctx.restore();
   }

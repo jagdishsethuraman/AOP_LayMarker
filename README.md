@@ -2,7 +2,7 @@
 
 > **Phase-Locked Digital Garment Pattern Nesting Engine with 100% Seam Matching & Miter Verification for All-Over-Printed (AOP) Fabrics**
 
-[![Tests](https://img.shields.io/badge/tests-14%2F14%20passing-success.svg)](#automated-testing)
+[![Tests](https://img.shields.io/badge/tests-17%2F17%20passing-success.svg)](#automated-testing)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](#installation--launch)
 [![Zero-Dependency](https://img.shields.io/badge/dependencies-zero%20external-brightgreen.svg)](#architecture)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](#license)
@@ -25,6 +25,7 @@ This guarantees **$\Delta_{\text{mismatch}} \equiv 0.00\text{ mm}$** upon sewing
 
 ## 🚀 Key Features
 
+* **Interactive Phase Calibrator (Design Match Mode):** Click and drag the repeating print pattern directly across the assembled 2D garment silhouette. Auto-computes and syncs phase offsets $(\Delta u_i, \Delta v_i)$ across all panels with 1-click Center Front Placket centering.
 * **Discrete Repeat Lattice Engine:** Automatically quantizes horizontal and vertical placement space based on repeat scale ($W_{\text{rep}} \times H_{\text{rep}}$ mm).
 * **Bottom-Left-Lattice (BLL) & 2-Opt Compactor:** Fast candidate solver evaluating Separating Axis Theorem (SAT) concave polygon collisions and 4mm cutting clearance buffers in $<60\text{ms}$.
 * **Magnetic Phase-Snap Drag & Drop:** Move pieces manually on the fabric roll—pieces magnetically snap strictly to valid repeat lattice coordinates with real-time green/red collision warnings.
@@ -92,7 +93,19 @@ cd AOP_LayMarker
 python3 -m unittest discover -s tests -p "test_*.py" -v
 ```
 
-All 14 unit and integration tests execute in $\approx 50\text{ms}$.
+All 17 unit and integration tests execute in $\approx 55\text{ms}$.
+
+---
+
+## 🗺️ Product Roadmap
+
+* [x] **Phase 1–6:** Core Geometry, Phase Lattice, Presets, BLL Nesting, Sleek Slate Web Studio, 100% Seam Matching.
+* [x] **Custom Import Wizard:** Seamless artwork upload, SVG/DXF/JSON CAD importers, Seam Linker.
+* [x] **Interactive Phase Calibrator:** Real-time visual pattern dragging over assembled garment with CF placket auto-centering.
+* [ ] **Multi-Size / Ratio Nesting:** Multi-size markers (e.g. $1\times S + 2\times M + 1\times L$) on a single fabric roll to push fabric yield to $>85\%$.
+* [ ] **Bias & Chevron Mitering Solver ($45^\circ / -45^\circ$):** Automatic diagonal lattice search for diamond plaid yokes, pockets, collar points, and chevron lapels.
+* [ ] **Fabric Shrinkage & Bow/Skew Compensation:** Parametric post-print steam shrinkage ($\pm 1\text{–}3\%$) and weft skew angle ($\theta$) calibration sliders.
+* [ ] **Industrial Cutter Exporters:** Direct native export to Gerber Accumark, Lectra Vector, and Eastman cutting plotters (AAMA DXF / HP-GL `.plt`).
 
 ---
 
